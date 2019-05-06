@@ -1,9 +1,9 @@
 import socket
 
-# this script is just fotr
+# this script is just for
 
 UDP_IP = "127.0.0.1"
-UDP_PORT = 5354
+UDP_PORT = 1337
 
 sock = socket.socket(socket.AF_INET,  # Internet
                      socket.SOCK_DGRAM)  # UDP
