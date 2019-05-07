@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Venom DNS server attacker
 
@@ -6,26 +6,19 @@ This script makes
 
 """
 
-from socket import *
+from scapy.layers.dns import DNS, DNSQR
+from scapy.layers.inet import IP, UDP
+from scapy.sendrecv import sr1
 
-from util import decode_dns_message
-
-VENOM_IP = "192.168.56.1"
-VENOM_PORT = 53
-BUFFER_SIZE = 1024
+TARGET_IP = "8.8.8.8"  # vulnDNS's IP
+TARGET_PORT = 53
+DNS_URL_BADGUY = "andrealacava.com"
 
 
 def main():
-    sock = socket(AF_INET, SOCK_DGRAM)
-    print("Initialize server...")
-    sock.bind((VENOM_IP, VENOM_PORT))
-    print("Server open on " + str(VENOM_PORT) + " !")
-
-    while True:
-        data, addr = sock.recvfrom(BUFFER_SIZE)
-        # print("Received from \"" + addr[0] + "\": " + str(data))
-
-        print(decode_dns_message(data))
+    dns_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT) / DNS(rd=1, qd=DNSQR(qname=DNS_URL_BADGUY))
+    answer = sr1(dns_req, verbose=0)
+    print(answer[DNS].summary())
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """Listener UDP server
@@ -19,9 +19,15 @@ def main():
                   SOCK_DGRAM)  # UDP
     sock.bind((UDP_IP, UDP_PORT))
 
-    while True:
-        data, addr = sock.recvfrom(BUFFER_SIZE)
-        print("Received from \"" + addr[0] + "\": " + str(data))
+    try:
+        while True:
+            data, addr = sock.recvfrom(BUFFER_SIZE)
+            print("Received from \"" + addr[0] + "\": " + str(data))
+    except KeyboardInterrupt:
+        print("Closing socket to exit gracefully...")
+        sock.close()
+        print("Socket close, bye bye!")
+        exit(0)
 
 
 if __name__ == "__main__":
