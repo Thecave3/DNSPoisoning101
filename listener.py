@@ -21,7 +21,7 @@ def main():
 
     while True:
         data, addr = sock.recvfrom(BUFFER_SIZE)
-        print("Received from %s : %s", addr, data)
+        print("Received from \"" + addr[0] + "\": " + str(data))
 
 
 if __name__ == "__main__":
