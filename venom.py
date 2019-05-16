@@ -5,7 +5,6 @@
 This script makes
 
 """
-import signal
 import string
 
 from scapy.config import conf
@@ -59,13 +58,6 @@ ATTACK_GOING_ON = True
 
 TARGET_PORT = 0
 STARTING_QUERY_ID = 0
-
-
-def signal_handler():
-    print('You pressed Ctrl+C, Closing everything!')
-    global ATTACK_GOING_ON
-    ATTACK_GOING_ON = False
-    sys.exit(0)
 
 
 def dns_server_routine():
@@ -245,8 +237,6 @@ def main():
     bite_rat_thread = threading.Thread(name="bite_rat_thread", target=bite_the_rat)
     dns_badguy_thread.start()
     bite_rat_thread.start()
-
-    signal.signal(signal.SIGINT, signal_handler)
 
     bite_rat_thread.join()
     dns_badguy_thread.join()
