@@ -1,7 +1,32 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Util library
+
+Just an utility library to parse the DNS raw request
+
+"""
 import struct
 
 
 def decode_labels(message, offset):
+    """Decode the various labels
+
+    Parameters
+    ----------
+    message : struct
+        The DNS packet in bytes
+
+    offset : int
+        offset value of the packet
+
+    Returns
+    -------
+    list
+        list of decoded labels
+
+    offset : int
+        offset remaining of the value
+    """
     labels = []
 
     while True:
@@ -29,6 +54,28 @@ DNS_QUERY_SECTION_FORMAT = struct.Struct("!2H")
 
 
 def decode_question_section(message, offset, qdcount):
+    """Decode the question section of the DNS packet
+
+    Parameters
+    ----------
+    message : struct
+        The DNS packet in bytes
+
+    offset : int
+        offset value of the packet
+
+    qdcount : int
+        number of questions present in the packet
+
+
+    Returns
+    -------
+    questions: list
+        random string generated with length url_length
+
+    offset : int
+        offset remaining of the value
+    """
     questions = []
 
     for _ in range(qdcount):
@@ -50,6 +97,18 @@ DNS_QUERY_MESSAGE_HEADER = struct.Struct("!6H")
 
 
 def decode_dns_message(message):
+    """Decode the DNS message
+
+    Parameters
+    ----------
+    message : struct
+        The DNS packet in bytes
+
+    Returns
+    -------
+    result: dict
+        dictionary representing the packet
+    """
     id, misc, qdcount, ancount, nscount, arcount = DNS_QUERY_MESSAGE_HEADER.unpack_from(message)
 
     qr = (misc & 0x8000) != 0

