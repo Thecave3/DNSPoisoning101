@@ -153,7 +153,7 @@ def bite_the_rat():
 
     This function is the main core of the program:
         1) Sends the DNS requests for badguy.ru to get query id and source port to vulnDNS
-        2) Creates fake answers packets
+        2) Creates fake answer packets
         3) Send the DNS request for bankofallan.co.uk to vulnDNS
         4) Attack with fake answers packets
 
