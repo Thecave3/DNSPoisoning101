@@ -65,6 +65,9 @@ TARGET_PORT = 0
 STARTING_QUERY_ID = 0
 
 
+# please note that there'are some magic number not really useful for the final purpose of the attack
+# in fact the standard DNS port is always referred with number 53 and the ttl is always a very large value
+
 def dns_server_routine():
     """DNS server routine
 
